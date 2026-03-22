@@ -1,12 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
-import { fetchVenues, fetchRawVenues, enrichVenues as enrichVenuesApi, buildNightPlan } from '@/services/api.js'
+import { ref, computed } from 'vue'
+import { fetchVenues, fetchRawVenues, enrichVenues as enrichVenuesApi } from '@/services/api.js'
 import { requestGeolocation } from '@/composables/useGeolocation.js'
-
-function load(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) ?? JSON.stringify(fallback)) }
-  catch { return fallback }
-}
+import { usePlanStore } from '@/stores/plan.js'
+import { useFavouritesStore } from '@/stores/favourites.js'
 
 export const useVenuesStore = defineStore('venues', () => {
   const venues           = ref([])
@@ -32,7 +29,7 @@ export const useVenuesStore = defineStore('venues', () => {
   // ── vibe ──────────────────────────────────────────────────────────────────
 
   const vibe   = ref(localStorage.getItem('whim_vibe') ?? null)
-  const radius = ref(2000)
+  const radius = ref(5000)
 
   let _sceneInit = null
   try { _sceneInit = JSON.parse(localStorage.getItem('whim_scene') ?? 'null') } catch {}
@@ -45,175 +42,12 @@ export const useVenuesStore = defineStore('venues', () => {
     uber:    true,
   })
 
-  // ── plan + taste ─────────────────────────────────────────────────────────
-
-  const planVenues   = ref(load('whim_plan', []))
-  const tasteProfile = ref(load('whim_taste', {}))
-  const favourites   = ref(load('whim_favourites', []))
-  const builtPlan    = ref(null)
-  const currentPlan  = ref(null)
-  const planBuilding = ref(false)
-  const planError    = ref(null)
-  const showPlan     = ref(false)
-  let   rebuildTimer = null
-
-  watch(tasteProfile, val => localStorage.setItem('whim_taste', JSON.stringify(val)), { deep: true })
-  watch(favourites,   val => localStorage.setItem('whim_favourites', JSON.stringify(val)), { deep: true })
-
-  function schedulePlanRebuild() {
-    if (rebuildTimer) clearTimeout(rebuildTimer)
-    if (planVenues.value.length < 2) {
-      currentPlan.value  = null
-      planBuilding.value = false
-      return
-    }
-    planBuilding.value = true
-    rebuildTimer = setTimeout(() => rebuildPlan(), 1500)
-  }
-
-  async function rebuildPlan() {
-    if (planVenues.value.length < 2) {
-      currentPlan.value  = null
-      planBuilding.value = false
-      return
-    }
-    planBuilding.value = true
-    planError.value    = null
-    console.log('[plan] rebuilding for', planVenues.value.map(v => v.name))
-    try {
-      const plan = await buildNightPlan({
-        venues: planVenues.value,
-        intent: currentIntent.value,
-        vibe:   vibe.value,
-      })
-
-      // Inject any venues GPT dropped so all saved places always appear
-      const plannedNames = plan.stops.map(s => s.name.toLowerCase())
-      const missing = planVenues.value.filter(v =>
-        !plannedNames.some(n =>
-          n.includes(v.name.toLowerCase()) || v.name.toLowerCase().includes(n)
-        )
-      )
-      if (missing.length) {
-        console.log('[plan] injecting missing venues:', missing.map(v => v.name))
-        missing.forEach(venue => {
-          plan.stops.push({
-            name:        venue.name,
-            time:        'TBD',
-            description: venue.vibe_reason ?? 'Worth checking out.',
-            transition:  venue.distance_minutes ? `${venue.distance_minutes} min walk` : null,
-          })
-        })
-      }
-
-      currentPlan.value = plan
-      console.log('[plan] rebuilt:', plan.stops?.map(s => `${s.time} ${s.name}`))
-    } catch (e) {
-      planError.value = 'Could not build plan'
-      console.log('[plan] rebuild failed:', e.message)
-    } finally {
-      planBuilding.value = false
-    }
-  }
-
-  function formatMins(totalMins) {
-    let hh  = Math.floor(totalMins / 60) % 24
-    let mm  = totalMins % 60
-    const p = hh >= 12 ? 'PM' : 'AM'
-    if (hh > 12) hh -= 12
-    if (hh === 0) hh = 12
-    return `${hh}:${String(mm).padStart(2, '0')} ${p}`
-  }
-
-  function rebuildPlanWithOrder(nameOrder) {
-    if (!currentPlan.value?.stops) return
-
-    const now  = new Date()
-    let cursor = now.getHours() * 60 + now.getMinutes()
-
-    const DURATIONS = { daytime: 60, dinner: 75, drinks: 60, club: 120 }
-
-    const reordered = nameOrder
-      .map(name => {
-        const stop  = currentPlan.value.stops.find(s => s.name === name)
-        const venue = planVenues.value.find(v => v.name === name)
-        return stop ?? { name, time: 'TBD', category: 'drinks', tags: venue?.tags ?? [] }
-      })
-      .filter(Boolean)
-
-    const recalculated = reordered.map(stop => {
-      const venue    = planVenues.value.find(v => v.name === stop.name)
-      const category = stop.category ?? 'drinks'
-      const duration = DURATIONS[category] ?? 60
-      const peakH    = venue?.peak_hour ?? null
-      const ideal    = peakH ? (peakH * 60) - 30 : cursor
-      const start    = Math.max(ideal, cursor)
-      cursor = start + duration
-      return { ...stop, time: formatMins(start) }
-    })
-
-    currentPlan.value = { ...currentPlan.value, stops: recalculated }
-
-    const reorderedVenues = nameOrder
-      .map(name => planVenues.value.find(v => v.name === name))
-      .filter(Boolean)
-    const remaining = planVenues.value.filter(v => !nameOrder.includes(v.name))
-    planVenues.value = [...reorderedVenues, ...remaining]
-    localStorage.setItem('whim_plan', JSON.stringify(planVenues.value))
-
-    console.log('[plan] reordered instantly:', recalculated.map(s => `${s.time} ${s.name}`))
-  }
-
-  function addToPlan(venue) {
-    if (!planVenues.value.find(v => v.id === venue.id || v.name === venue.name)) {
-      planVenues.value.push(venue)
-      localStorage.setItem('whim_plan', JSON.stringify(planVenues.value))
-      schedulePlanRebuild()
-    }
-  }
-
-  function removeFromPlan(venueId) {
-    planVenues.value = planVenues.value.filter(
-      v => v.id !== venueId && v.name !== venueId
-    )
-    localStorage.setItem('whim_plan', JSON.stringify(planVenues.value))
-    schedulePlanRebuild()
-  }
-
-  function isInPlan(venue) {
-    return planVenues.value.some(
-      v => v.id === venue?.id || v.name === venue?.name
-    )
-  }
-
-  function clearPlan() {
-    planVenues.value   = []
-    currentPlan.value  = null
-    planBuilding.value = false
-    planError.value    = null
-    if (rebuildTimer) clearTimeout(rebuildTimer)
-    localStorage.removeItem('whim_plan')
-  }
-
-  function starVenue(venue) {
-    addToPlan(venue)
-    venue.tags?.forEach(tag => {
-      tasteProfile.value[tag.label ?? tag] =
-        (tasteProfile.value[tag.label ?? tag] ?? 0) + 1
-    })
-  }
-
-  // Restore plan from previous session
-  if (planVenues.value.length >= 2) {
-    setTimeout(() => rebuildPlan(), 500)
-  }
-
-  // ── computed ─────────────────────────────────────────────────────────────
+  // ── computed ──────────────────────────────────────────────────────────────
 
   const currentVenue = computed(() => venues.value[currentIndex.value] ?? null)
   const hasMore      = computed(() => currentIndex.value < venues.value.length)
 
-  // ── actions ──────────────────────────────────────────────────────────────
+  // ── actions ───────────────────────────────────────────────────────────────
 
   function setLocation(lat, lng) { userLocation.value = { lat, lng } }
   function setCity(name)         { city.value = name }
@@ -257,7 +91,6 @@ export const useVenuesStore = defineStore('venues', () => {
     localStorage.setItem('whim_scene', JSON.stringify(s))
     console.log('[store] scene changed — full reset')
   }
-
 
   // ── main enrichment pipeline ──────────────────────────────────────────────
 
@@ -407,7 +240,12 @@ export const useVenuesStore = defineStore('venues', () => {
 
   function swipeRight() {
     console.log('[whim] go →', currentVenue.value?.name)
-    if (currentVenue.value) addToPlan(currentVenue.value)
+    const planStore = usePlanStore()
+    const favStore  = useFavouritesStore()
+    if (currentVenue.value) {
+      planStore.addToPlan(currentVenue.value)
+      favStore.addVibeWeight(currentVenue.value.tags)
+    }
     nextVenue()
     maybeLoadMore()
   }
@@ -544,52 +382,28 @@ export const useVenuesStore = defineStore('venues', () => {
     console.log(`[reset] replaying ${shuffled.length} venues in new order`)
   }
 
-  // ── favourites ────────────────────────────────────────────────────────────
-
-  function starVenue(venue) {
-    if (!favourites.value.find(v =>
-      v.name === venue.name || v.google_place_id === venue.google_place_id
-    )) {
-      favourites.value.push({ ...venue, starred_at: new Date().toISOString() })
-      console.log('[star] added:', venue.name)
-    }
-    // Strengthen taste profile — 2x weight vs swipe right
-    venue.tags?.forEach(tag => {
-      const label = tag.label ?? tag
-      tasteProfile.value[label] = (tasteProfile.value[label] ?? 0) + 2
-    })
-    localStorage.setItem('whim_taste', JSON.stringify(tasteProfile.value))
-  }
-
-  function unstarVenue(venueName) {
-    favourites.value = favourites.value.filter(
-      v => v.name !== venueName && v.google_place_id !== venueName
-    )
-    console.log('[star] removed:', venueName)
-  }
-
-  function isStarred(venue) {
-    return favourites.value.some(
-      v => v.name === venue?.name || v.google_place_id === venue?.google_place_id
-    )
-  }
-
   function boostStarredVenues() {
-    if (!favourites.value.length) return
+    const favStore = useFavouritesStore()
+    if (!favStore.favourites.length) return
+
     const currentIdx = currentIndex.value
     const seen       = venues.value.slice(0, currentIdx + 1)
     const remaining  = venues.value.slice(currentIdx + 1)
 
-    const withBoost  = remaining.map(v => ({ ...v, isStarredVenue: isStarred(v) }))
+    const withBoost  = remaining.map(v => ({
+      ...v,
+      isStarredVenue: favStore.isStarred(v),
+    }))
     const starred    = withBoost.filter(v => v.isStarredVenue)
     const nonStarred = withBoost.filter(v => !v.isStarredVenue)
 
-    // Mix one starred in every 5 cards naturally
     const mixed = []
     let si = 0
     nonStarred.forEach((v, i) => {
       mixed.push(v)
-      if ((i + 1) % 5 === 0 && si < starred.length) mixed.push(starred[si++])
+      if ((i + 1) % 5 === 0 && si < starred.length) {
+        mixed.push(starred[si++])
+      }
     })
     while (si < starred.length) mixed.push(starred[si++])
 
@@ -612,16 +426,11 @@ export const useVenuesStore = defineStore('venues', () => {
     vibe, radius, scene,
     isEnriching, firstBatchReady, shownVenueIds, skippedVenues, searchRound,
     phase, sessionPool, bestOfShown,
-    planVenues, tasteProfile, builtPlan,
     currentVenue, hasMore,
     setLocation, setCity, setIntent, setTransport,
     setVibe, setScene,
     startEnrichment, loadVenues,
     nextVenue, swipeRight, swipeLeft, maybeLoadMore,
     fetchRound2, showBestOf, resetSession, resurfaceSkipped,
-    currentPlan, planBuilding, planError, showPlan,
-    schedulePlanRebuild, rebuildPlan, rebuildPlanWithOrder,
-    addToPlan, removeFromPlan, isInPlan, clearPlan,
-    favourites, starVenue, unstarVenue, isStarred, boostStarredVenues,
   }
 })

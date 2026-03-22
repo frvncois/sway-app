@@ -83,7 +83,7 @@
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { SCENES } from '@/data/scenes.js'
-import { useRouter } from 'vue-router'
+import { usePlanStore } from '@/stores/plan.js'
 
 const props = defineProps({
   venueName: String,
@@ -91,8 +91,8 @@ const props = defineProps({
   show:      Boolean,
 })
 
-const emit   = defineEmits(['dismiss', 'switch-intent'])
-const router = useRouter()
+const emit      = defineEmits(['dismiss', 'switch-intent'])
+const planStore = usePlanStore()
 
 const step           = ref('intents')
 const selectedIntent = ref(null)
@@ -100,10 +100,12 @@ const progressKey    = ref(0)
 let   autoTimer      = null
 
 const INTENTS = [
-  { label: 'Dinner', value: 'dinner', color: 'amber' },
-  { label: 'Drinks', value: 'drinks', color: 'blue'  },
-  { label: 'Shop',   value: 'shop',   color: 'green' },
-  { label: 'Visit',  value: 'visit',  color: 'blue'  },
+  { label: 'Dinner',    value: 'dinner',    color: 'amber'  },
+  { label: 'Drinks',    value: 'drinks',    color: 'blue'   },
+  { label: 'Shop',      value: 'shop',      color: 'green'  },
+  { label: 'Visit',     value: 'visit',     color: 'teal'   },
+  { label: 'Party',     value: 'party',     color: 'purple' },
+  { label: 'Late eats', value: 'late_eats', color: 'red'    },
 ]
 
 const scenes = computed(() =>
@@ -151,8 +153,8 @@ function onBack() {
 }
 
 function onSeePlan() {
+  planStore.showPlan = true
   emit('dismiss')
-  router.push('/plan')
 }
 
 onUnmounted(() => clearTimeout(autoTimer))
@@ -254,6 +256,16 @@ onUnmounted(() => clearTimeout(autoTimer))
   border-color: rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.03);
   color: rgba(255,255,255,0.3);
+}
+.toast-pill--teal {
+  border-color: rgba(45,185,140,0.22);
+  background: rgba(45,185,140,0.08);
+  color: rgba(45,185,140,0.85);
+}
+.toast-pill--red {
+  border-color: rgba(255,107,107,0.22);
+  background: rgba(255,107,107,0.08);
+  color: rgba(255,107,107,0.85);
 }
 .toast-scene-header {
   display: flex; align-items: center; gap: 10px;

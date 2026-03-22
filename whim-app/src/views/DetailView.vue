@@ -1,6 +1,6 @@
 <template>
   <div class="relative h-full overflow-hidden">
-    <TopBar :showBack="true" :plan-count="store.favourites.length" />
+    <TopBar :showBack="true" :plan-count="favStore.favouriteCount" />
     <!-- Dimmed card behind -->
     <div ref="bgCardEl" class="absolute inset-0 pointer-events-none fade-overlay" style="opacity: 0">
       <div class="px-4 pt-16">
@@ -166,7 +166,7 @@
             @click="onStarTap"
           >
             <Star :size="16" :fill="starred ? 'currentColor' : 'none'" />
-            {{ starred ? 'Saved' : 'Save' }}
+            {{ starred ? 'Saved ★' : 'Save + Plan' }}
           </button>
           <!-- Remove -->
           <button
@@ -193,10 +193,14 @@ import BottomSheet from '@/components/app/BottomSheet.vue'
 import TopBar      from '@/components/app/TopBar.vue'
 import VenueTag    from '@/components/app/VenueTag.vue'
 import DistanceDot from '@/components/app/DistanceDot.vue'
-import { useVenuesStore } from '@/stores/venues.js'
+import { useVenuesStore }    from '@/stores/venues.js'
+import { usePlanStore }       from '@/stores/plan.js'
+import { useFavouritesStore } from '@/stores/favourites.js'
 
-const router   = useRouter()
-const store    = useVenuesStore()
+const router    = useRouter()
+const store     = useVenuesStore()
+const planStore = usePlanStore()
+const favStore  = useFavouritesStore()
 const sheetRef = ref(null)
 const bgCardEl = ref(null)
 const dimEl    = ref(null)
@@ -204,7 +208,7 @@ const starBtnEl    = ref(null)
 const showAllReviews = ref(false)
 
 const venue   = computed(() => store.currentVenue)
-const starred = computed(() => store.isStarred(venue.value))
+const starred = computed(() => favStore.isStarred(venue.value))
 
 const mapsUrl = computed(() => {
   const id = venue.value?.google_place_id
@@ -239,9 +243,11 @@ const photoStrips = computed(() => {
 function onStarTap() {
   if (!venue.value) return
   if (starred.value) {
-    store.unstarVenue(venue.value.name)
+    favStore.unstarVenue(venue.value.name)
+    planStore.removeFromPlan(venue.value.name)
   } else {
-    store.starVenue(venue.value)
+    favStore.starVenue(venue.value)
+    planStore.addToPlan(venue.value)
   }
   gsap.fromTo(starBtnEl.value, { scale: 1 }, {
     scale: 1.12,

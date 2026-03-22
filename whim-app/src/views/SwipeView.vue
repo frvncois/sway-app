@@ -1,6 +1,6 @@
 <template>
   <div class="relative flex flex-col h-full">
-    <TopBar :showBack="true" :plan-count="store.favourites.length" />
+    <TopBar :showBack="true" :plan-count="favStore.favouriteCount" />
     <!-- Header -->
     <div class="px-5 pt-12 pb-4">
       <p class="text-[13px] font-medium tracking-widest uppercase text-text-muted">
@@ -83,7 +83,7 @@
         <SwipeCard
           :key="currentVenue.id"
           :venue="currentVenue"
-          :is-starred-venue="store.isStarred(currentVenue)"
+          :is-starred-venue="favStore.isStarred(currentVenue)"
           @tap="$router.push('/detail')"
           @swipe-right="onSwipeRight"
           @swipe-left="onSwipeLeft"
@@ -137,10 +137,12 @@ import SwipeCard     from '@/components/app/SwipeCard.vue'
 import TopBar        from '@/components/app/TopBar.vue'
 import LoadingScreen from '@/components/app/LoadingScreen.vue'
 import AddedToast    from '@/components/app/AddedToast.vue'
-import { useVenuesStore } from '@/stores/venues.js'
+import { useVenuesStore }    from '@/stores/venues.js'
+import { useFavouritesStore } from '@/stores/favourites.js'
 
-const router = useRouter()
-const store  = useVenuesStore()
+const router   = useRouter()
+const store    = useVenuesStore()
+const favStore = useFavouritesStore()
 
 const cardWrapEl   = ref(null)
 const buttonsEl    = ref(null)

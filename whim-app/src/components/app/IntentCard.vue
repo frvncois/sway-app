@@ -20,7 +20,8 @@ const props = defineProps({
   color: {
     type: String,
     default: 'amber',
-    validator: v => ['amber', 'blue', 'green', 'purple'].includes(v),
+    validator: v =>
+      ['amber', 'blue', 'green', 'purple', 'teal', 'gold', 'red'].includes(v),
   },
   icon: { type: [Object, Function], default: null },
 })
@@ -47,6 +48,21 @@ const colorConfig = computed(() => ({
     bg:     'bg-purple/5',
     border: 'border-purple/15',
     text:   'text-purple',
+  },
+  teal: {
+    bg:     'bg-teal/5',
+    border: 'border-teal/15',
+    text:   'text-teal',
+  },
+  gold: {
+    bg:     'bg-gold/5',
+    border: 'border-gold/15',
+    text:   'text-gold',
+  },
+  red: {
+    bg:     'bg-red/5',
+    border: 'border-red/15',
+    text:   'text-red',
   },
 }[props.color]))
 </script>

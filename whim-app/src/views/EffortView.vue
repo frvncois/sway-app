@@ -55,11 +55,13 @@ const ringClass = {
   blue:   'ring-1 ring-blue/40',
   purple: 'ring-1 ring-purple/40',
   green:  'ring-1 ring-green/40',
+  teal:   'ring-1 ring-teal/40',
+  red:    'ring-1 ring-red/40',
 }
 
-function onChipClick(chip) {
-  store.setEffort(chip.effort)
-  store.setRadius(chip.radius)
+function onChipClick(_chip) {
+  // Effort step removed — radius is now fixed at 5000 in the store
+  // This view is kept for reference but is no longer routed to
   store.startEnrichment()
   router.push('/swipe')
 }

@@ -1,16 +1,37 @@
-import { ref } from 'vue'
+// ── shared module-level cache ──────────────────────────────
+const CACHE_TTL = 5 * 60 * 1000  // 5 minutes
 
-// Module-level cache — survives navigations within the session
-let cachedLat       = null
-let cachedLng       = null
-let cacheTimestamp  = null
-const CACHE_TTL     = 5 * 60 * 1000 // 5 minutes
+const _cache = {
+  lat:       null,
+  lng:       null,
+  timestamp: null,
 
-// Standalone Promise wrapper — safe to import outside of Vue components
+  isValid() {
+    return (
+      this.lat !== null &&
+      this.lng !== null &&
+      this.timestamp !== null &&
+      Date.now() - this.timestamp < CACHE_TTL
+    )
+  },
+
+  set(lat, lng) {
+    this.lat       = lat
+    this.lng       = lng
+    this.timestamp = Date.now()
+  },
+
+  clear() {
+    this.lat       = null
+    this.lng       = null
+    this.timestamp = null
+  },
+}
+
+// ── standalone promise wrapper (safe outside Vue components) ─
 export function requestGeolocation() {
-  const now = Date.now()
-  if (cachedLat && cachedLng && cacheTimestamp && now - cacheTimestamp < CACHE_TTL) {
-    return Promise.resolve({ lat: cachedLat, lng: cachedLng })
+  if (_cache.isValid()) {
+    return Promise.resolve({ lat: _cache.lat, lng: _cache.lng })
   }
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -19,10 +40,8 @@ export function requestGeolocation() {
     }
     navigator.geolocation.getCurrentPosition(
       pos => {
-        cachedLat      = pos.coords.latitude
-        cachedLng      = pos.coords.longitude
-        cacheTimestamp = Date.now()
-        resolve({ lat: cachedLat, lng: cachedLng })
+        _cache.set(pos.coords.latitude, pos.coords.longitude)
+        resolve({ lat: _cache.lat, lng: _cache.lng })
       },
       err => reject(err),
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 },
@@ -30,19 +49,20 @@ export function requestGeolocation() {
   })
 }
 
+// ── Vue composable ────────────────────────────────────────────
+import { ref } from 'vue'
+
 export function useGeolocation() {
-  const lat     = ref(cachedLat)
-  const lng     = ref(cachedLng)
+  const lat     = ref(_cache.lat)
+  const lng     = ref(_cache.lng)
   const error   = ref(null)
   const loading = ref(false)
 
   function requestLocation() {
-    // Return cached coords if still fresh
-    const now = Date.now()
-    if (cachedLat && cachedLng && cacheTimestamp && now - cacheTimestamp < CACHE_TTL) {
-      lat.value = cachedLat
-      lng.value = cachedLng
-      return Promise.resolve({ lat: cachedLat, lng: cachedLng })
+    if (_cache.isValid()) {
+      lat.value = _cache.lat
+      lng.value = _cache.lng
+      return Promise.resolve({ lat: _cache.lat, lng: _cache.lng })
     }
 
     return new Promise((resolve, reject) => {
@@ -57,13 +77,11 @@ export function useGeolocation() {
 
       navigator.geolocation.getCurrentPosition(
         pos => {
-          cachedLat      = pos.coords.latitude
-          cachedLng      = pos.coords.longitude
-          cacheTimestamp = Date.now()
-          lat.value      = cachedLat
-          lng.value      = cachedLng
-          loading.value  = false
-          resolve({ lat: cachedLat, lng: cachedLng })
+          _cache.set(pos.coords.latitude, pos.coords.longitude)
+          lat.value     = _cache.lat
+          lng.value     = _cache.lng
+          loading.value = false
+          resolve({ lat: _cache.lat, lng: _cache.lng })
         },
         () => {
           error.value   = 'Location access denied'
@@ -75,5 +93,11 @@ export function useGeolocation() {
     })
   }
 
-  return { lat, lng, error, loading, requestLocation }
+  function clearCache() {
+    _cache.clear()
+    lat.value = null
+    lng.value = null
+  }
+
+  return { lat, lng, error, loading, requestLocation, clearCache }
 }

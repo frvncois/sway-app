@@ -1,10 +1,10 @@
 <template>
   <div class="relative flex flex-col h-full overflow-y-auto" style="background: #0C0B0A">
-    <TopBar :showBack="true" :plan-count="store.planVenues.length" />
+    <TopBar :showBack="true" :plan-count="planStore.planCount" />
 
     <!-- No plan guard -->
     <div
-      v-if="!store.builtPlan"
+      v-if="!planStore.currentPlan"
       class="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center"
     >
       <p class="text-[20px] font-display font-light text-text-primary">No plan yet</p>
@@ -21,21 +21,21 @@
       <div class="px-5 pt-12 pb-6">
         <p class="text-[13px] font-medium tracking-widest uppercase text-text-muted mb-1">Tonight</p>
         <h1 class="text-[28px] font-display font-light text-text-primary leading-tight">
-          {{ store.builtPlan.summary }}
+          {{ planStore.currentPlan.summary }}
         </h1>
       </div>
 
       <!-- Timeline -->
       <div class="px-5 pb-8 flex flex-col">
         <div
-          v-for="(stop, i) in store.builtPlan.stops"
+          v-for="(stop, i) in planStore.currentPlan.stops"
           :key="i"
           class="flex gap-4"
         >
           <!-- Spine -->
           <div class="flex flex-col items-center" style="width: 52px; flex-shrink: 0">
             <div class="stop-dot" />
-            <div v-if="i < store.builtPlan.stops.length - 1" class="stop-line" />
+            <div v-if="i < planStore.currentPlan.stops.length - 1" class="stop-line" />
           </div>
 
           <!-- Card -->
@@ -71,11 +71,11 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { useVenuesStore } from '@/stores/venues.js'
+import { usePlanStore } from '@/stores/plan.js'
 import TopBar from '@/components/app/TopBar.vue'
 
-const store  = useVenuesStore()
-const router = useRouter()
+const planStore = usePlanStore()
+const router    = useRouter()
 </script>
 
 <style scoped>

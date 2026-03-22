@@ -14,12 +14,11 @@ export async function fetchVenues({ lat, lng, intent, radius = 1000, vibe = null
   }
 }
 
-export async function fetchRawVenues({ lat, lng, intent, radius = 5000, vibe, scene, city, exclude, round }) {
+export async function fetchRawVenues({ lat, lng, intent, radius = 5000, vibe, scene, city, round }) {
   try {
     const params = new URLSearchParams({ lat, lng, intent, radius, vibe: vibe ?? 'any', round: round ?? 1 })
-    if (scene)   params.append('scene', scene)
-    if (city)    params.append('city', city)
-    if (exclude) params.append('exclude', exclude)
+    if (scene) params.append('scene', scene)
+    if (city)  params.append('city', city)
     const res    = await fetch(`${BASE}/venues/raw?${params}`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const { venues } = await res.json()

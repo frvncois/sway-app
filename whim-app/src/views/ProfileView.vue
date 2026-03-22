@@ -54,7 +54,7 @@
           Star places you love to build this
         </p>
         <p v-if="vibeTags.length" class="text-[12px] font-display italic text-text-muted mt-3">
-          Based on {{ store.planVenues.length }} saved place{{ store.planVenues.length === 1 ? '' : 's' }}
+          Based on {{ planStore.planVenues.length }} saved place{{ planStore.planVenues.length === 1 ? '' : 's' }}
         </p>
       </SectionCard>
 
@@ -86,12 +86,16 @@ import TopBar         from '@/components/app/TopBar.vue'
 import SectionCard     from '@/components/app/SectionCard.vue'
 import VenueTag        from '@/components/app/VenueTag.vue'
 import TransportToggle from '@/components/app/TransportToggle.vue'
-import { useVenuesStore }  from '@/stores/venues.js'
-import { useGeolocation }  from '@/composables/useGeolocation.js'
-import { fetchCity }       from '@/services/api.js'
+import { useVenuesStore }    from '@/stores/venues.js'
+import { usePlanStore }       from '@/stores/plan.js'
+import { useFavouritesStore } from '@/stores/favourites.js'
+import { useGeolocation }     from '@/composables/useGeolocation.js'
+import { fetchCity }          from '@/services/api.js'
 
-const store = useVenuesStore()
-const geo   = useGeolocation()
+const store     = useVenuesStore()
+const planStore = usePlanStore()
+const favStore  = useFavouritesStore()
+const geo       = useGeolocation()
 
 const VARIANT_MAP = {
   amber:  ['cozy', 'local', 'quiet', 'chill', 'hidden gem', 'romantic'],
@@ -108,7 +112,7 @@ function getVariant(label) {
 }
 
 const vibeTags = computed(() =>
-  Object.entries(store.tasteProfile)
+  Object.entries(favStore.tasteProfile)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
     .map(([label]) => ({ label, variant: getVariant(label) }))

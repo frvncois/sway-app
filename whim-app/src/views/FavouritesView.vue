@@ -4,11 +4,11 @@
 
     <div class="fav-header">
       <span class="fav-title">Starred places</span>
-      <span class="fav-count">{{ store.favourites.length }}</span>
+      <span class="fav-count">{{ favStore.favouriteCount }}</span>
     </div>
 
     <!-- Empty state -->
-    <div v-if="!store.favourites.length" class="fav-empty">
+    <div v-if="!favStore.favourites.length" class="fav-empty">
       <p>No starred places yet</p>
       <p class="fav-empty-sub">Star places you love — we'll suggest them again</p>
     </div>
@@ -52,13 +52,14 @@
                     v-for="tag in venue.tags?.slice(0, 2)"
                     :key="tag.label ?? tag"
                     class="fav-tag"
+                  :class="`fav-tag--${tag.variant ?? 'amber'}`"
                   >{{ tag.label ?? tag }}</span>
                 </div>
                 <div class="fav-starred-at">Starred {{ formatStarredAt(venue.starred_at) }}</div>
               </div>
 
               <!-- Unstar button -->
-              <button class="fav-star" @click="store.unstarVenue(venue.name)">★</button>
+              <button class="fav-star" @click="favStore.unstarVenue(venue.name)">★</button>
 
             </div>
           </div>
@@ -72,12 +73,12 @@
 <script setup>
 import { ref, computed } from 'vue'
 import TopBar from '@/components/app/TopBar.vue'
-import { useVenuesStore } from '@/stores/venues'
+import { useFavouritesStore } from '@/stores/favourites.js'
 
-const store = useVenuesStore()
+const favStore = useFavouritesStore()
 
 const sortedFavourites = computed(() =>
-  [...store.favourites].sort((a, b) => new Date(b.starred_at) - new Date(a.starred_at))
+  [...favStore.favourites].sort((a, b) => new Date(b.starred_at) - new Date(a.starred_at))
 )
 
 function formatStarredAt(isoStr) {
@@ -118,7 +119,7 @@ function onTouchMove(e, name) {
 function onTouchEnd(e, name) {
   const s = swipeState.value[name]
   if (!s) return
-  if (s.currentX - s.startX < -80) store.unstarVenue(name)
+  if (s.currentX - s.startX < -80) favStore.unstarVenue(name)
   delete swipeState.value[name]
 }
 function getSwipeStyle(name) {
@@ -257,6 +258,13 @@ function getSwipeStyle(name) {
   border: 1px solid rgba(255,255,255,0.08);
   font-family: 'DM Sans', sans-serif;
 }
+.fav-tag--amber  { background: rgba(232,147,90,0.08);  color: rgba(232,147,90,0.7);  border-color: rgba(232,147,90,0.18);  }
+.fav-tag--blue   { background: rgba(107,142,255,0.08); color: rgba(107,142,255,0.7); border-color: rgba(107,142,255,0.15); }
+.fav-tag--purple { background: rgba(176,107,255,0.08); color: rgba(176,107,255,0.7); border-color: rgba(176,107,255,0.15); }
+.fav-tag--green  { background: rgba(123,198,126,0.08); color: rgba(123,198,126,0.7); border-color: rgba(123,198,126,0.15); }
+.fav-tag--teal   { background: rgba(45,185,140,0.08);  color: rgba(45,185,140,0.7);  border-color: rgba(45,185,140,0.15);  }
+.fav-tag--gold   { background: rgba(220,176,120,0.08); color: rgba(220,176,120,0.7); border-color: rgba(220,176,120,0.18); }
+.fav-tag--red    { background: rgba(255,107,107,0.08); color: rgba(255,107,107,0.7); border-color: rgba(255,107,107,0.15); }
 .fav-starred-at {
   font-size: 9px;
   color: rgba(255,255,255,0.15);

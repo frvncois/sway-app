@@ -11,7 +11,7 @@
         <span class="plan-title">Tonight's plan</span>
         <span class="plan-count">{{ activeStops.length }} stops</span>
       </div>
-      <button @click="router.push('/swipe')" class="close-btn">Done</button>
+      <button @click="router.push('/')" class="close-btn">Done</button>
     </div>
 
     <!-- Summary -->
@@ -28,12 +28,12 @@
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="!store.planVenues.length" class="plan-empty">
+    <div v-else-if="!planStore.planVenues.length" class="plan-empty">
       Swipe right on places to add them here
     </div>
 
     <!-- Need one more -->
-    <div v-else-if="store.planVenues.length === 1 && !isBuilding" class="plan-hint-row">
+    <div v-else-if="planStore.planVenues.length === 1 && !isBuilding" class="plan-hint-row">
       Add one more place to build a plan
     </div>
 
@@ -86,7 +86,7 @@
               <div class="stop-actions">
                 <button
                   class="remove-btn"
-                  @click="store.removeFromPlan(stop.name)"
+                  @click="planStore.removeFromPlan(stop.name)"
                   title="Remove"
                 >✕</button>
                 <div class="drag-icon">≡</div>
@@ -120,22 +120,22 @@
     </template>
 
     <!-- Error -->
-    <div v-if="store.planError" class="plan-error">
+    <div v-if="planStore.planError" class="plan-error">
       <span>Couldn't build plan</span>
-      <button @click="store.rebuildPlan()">Try again</button>
+      <button @click="planStore.rebuildPlan(store.currentIntent, store.vibe)">Try again</button>
     </div>
 
     <!-- CTA -->
     <button
       v-if="activeStops.length >= 1 && !isBuilding"
-      @click="router.push('/swipe')"
+      @click="router.push('/plan-result')"
       class="build-btn"
     >
       Let's go →
     </button>
 
     <!-- Clear -->
-    <button v-if="store.planVenues.length" @click="store.clearPlan()" class="clear-btn">
+    <button v-if="planStore.planVenues.length" @click="planStore.clearPlan()" class="clear-btn">
       Clear plan
     </button>
 
@@ -148,12 +148,14 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { VueDraggable } from 'vue-draggable-plus'
 import { useVenuesStore } from '@/stores/venues.js'
+import { usePlanStore }   from '@/stores/plan.js'
 
-const store  = useVenuesStore()
-const router = useRouter()
+const store     = useVenuesStore()
+const planStore = usePlanStore()
+const router    = useRouter()
 
-const plan       = computed(() => store.currentPlan)
-const isBuilding = computed(() => store.planBuilding)
+const plan       = computed(() => planStore.currentPlan)
+const isBuilding = computed(() => planStore.planBuilding)
 
 // ── Active vs Past ────────────────────────────────────────────
 
@@ -182,7 +184,7 @@ function isStopPast(stop) {
 }
 
 const fallbackStops = computed(() =>
-  store.planVenues.map(v => ({
+  planStore.planVenues.map(v => ({
     name: v.name, time: 'TBD', tags: v.tags,
     neighborhood: v.neighborhood, distance_minutes: v.distance_minutes,
   }))
@@ -199,13 +201,13 @@ const draggableStops = ref([])
 watch(activeStops, stops => { draggableStops.value = [...stops] }, { immediate: true })
 
 function onReorder() {
-  store.rebuildPlanWithOrder(draggableStops.value.map(s => s.name))
+  planStore.rebuildPlanWithOrder(draggableStops.value.map(s => s.name))
 }
 
 // ── Helpers ───────────────────────────────────────────────────
 
 function getPhotoStyle(stop) {
-  const venue = store.planVenues.find(v => v.name === stop.name)
+  const venue = planStore.planVenues.find(v => v.name === stop.name)
   const photos = venue?.photos
   if (photos?.length) {
     return { backgroundImage: `url(${photos[0]})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -216,17 +218,17 @@ function getPhotoStyle(stop) {
 }
 
 function getVenueAddress(stop) {
-  const v = store.planVenues.find(v => v.name === stop.name)
+  const v = planStore.planVenues.find(v => v.name === stop.name)
   return v?.neighborhood ?? null
 }
 
 function getVenueTags(stop) {
-  const v = store.planVenues.find(v => v.name === stop.name)
+  const v = planStore.planVenues.find(v => v.name === stop.name)
   return v?.tags?.slice(0, 2) ?? []
 }
 
-function getTransition(stop, nextStop) {
-  const v = store.planVenues.find(v => v.name === nextStop?.name)
+function getTransition(_stop, nextStop) {
+  const v = planStore.planVenues.find(v => v.name === nextStop?.name)
   if (v?.distance_minutes) return `${v.distance_minutes} min walk`
   return null
 }
@@ -387,6 +389,9 @@ function getTransition(stop, nextStop) {
 .stop-tag--blue   { background: rgba(107,142,255,0.1); color: rgba(107,142,255,0.7); border-color: rgba(107,142,255,0.18); }
 .stop-tag--purple { background: rgba(176,107,255,0.1); color: rgba(176,107,255,0.7); border-color: rgba(176,107,255,0.18); }
 .stop-tag--green  { background: rgba(123,198,126,0.1); color: rgba(123,198,126,0.7); border-color: rgba(123,198,126,0.18); }
+.stop-tag--teal { background: rgba(45,185,140,0.1);  color: rgba(45,185,140,0.7);  border-color: rgba(45,185,140,0.18);  }
+.stop-tag--gold { background: rgba(220,176,120,0.1); color: rgba(220,176,120,0.7); border-color: rgba(220,176,120,0.18); }
+.stop-tag--red  { background: rgba(255,107,107,0.1); color: rgba(255,107,107,0.7); border-color: rgba(255,107,107,0.18); }
 .stop-desc {
   font-size: 10px;
   color: rgba(255,255,255,0.2);
